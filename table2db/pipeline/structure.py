@@ -25,11 +25,26 @@ def detect_structure(
         # Detect islands first
         islands = detect_table_islands(sheet.rows)
 
-        if len(islands) <= 1:
+        if len(islands) == 0:
             sheet_warnings = _process_sheet(sheet, header_min_fill_ratio, header_min_string_ratio)
             warnings.extend(sheet_warnings)
             if sheet.headers and sheet.rows:
                 sheet.metadata.setdefault("island_confidence", 1.0)
+                kept_sheets.append(sheet)
+            else:
+                warnings.append(
+                    f"Sheet '{sheet.name}' removed: no headers or no data rows"
+                )
+        elif len(islands) == 1:
+            island = islands[0]
+            sheet.rows = [
+                row[island.col_start:island.col_end]
+                for row in sheet.rows[island.row_start:island.row_end]
+            ]
+            sheet_warnings = _process_sheet(sheet, header_min_fill_ratio, header_min_string_ratio)
+            warnings.extend(sheet_warnings)
+            if sheet.headers and sheet.rows:
+                sheet.metadata.setdefault("island_confidence", island.confidence)
                 kept_sheets.append(sheet)
             else:
                 warnings.append(

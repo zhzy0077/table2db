@@ -212,3 +212,41 @@ def test_multi_table_detection():
     assert len(wb.sheets[0].rows) == 3
     # Second table should have 3 data rows
     assert len(wb.sheets[1].rows) == 3
+
+
+def test_single_table_empty_left_right_columns_trimmed():
+    """A single table with empty left/right columns should have those columns trimmed."""
+    sheet = SheetData(
+        name="Test",
+        rows=[
+            [None, None, "id", "name", "val", None],
+            [None, None, 1, "a", 10, None],
+            [None, None, 2, "b", 20, None],
+            [None, None, 3, "c", 30, None],
+        ],
+    )
+    wb, _ = detect_structure(_make_wb(sheet))
+    s = wb.sheets[0]
+    assert s.headers == ["id", "name", "val"]
+    assert len(s.rows) == 3
+    assert s.rows[0] == [1, "a", 10]
+
+
+def test_single_table_empty_top_bottom_rows_trimmed():
+    """A single table with empty top/bottom rows should have those rows trimmed."""
+    sheet = SheetData(
+        name="Test",
+        rows=[
+            [None, None, None],
+            [None, None, None],
+            ["id", "name", "val"],
+            [1, "a", 10],
+            [2, "b", 20],
+            [3, "c", 30],
+            [None, None, None],
+        ],
+    )
+    wb, _ = detect_structure(_make_wb(sheet))
+    s = wb.sheets[0]
+    assert s.headers == ["id", "name", "val"]
+    assert len(s.rows) == 3
