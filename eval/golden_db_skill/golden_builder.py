@@ -28,12 +28,16 @@ def create_golden_db(db_path: str, tables: dict[str, dict]):
         db_path: Output .db file path.
         tables: {
             "table_name": {
-                "columns": [{"name": str, "type": str}, ...],
+                "columns": [{"name": str, "type": str, "ref": str}, ...],
                 "rows": [[val, ...], ...],
                 "source_sheet": str,
                 "description": str,
             }
         }
+        
+        Each column's "ref" is an Excel range like "Sheet1!A2:A100".
+        If "ref" is omitted, a synthetic ref is generated from source_sheet
+        and column position.
     """
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     if os.path.exists(db_path):
@@ -52,15 +56,20 @@ def create_golden_db(db_path: str, tables: dict[str, dict]):
                 [tuple(r) for r in tbl_def["rows"]],
             )
     
-    # Store metadata
-    conn.execute("CREATE TABLE _golden_meta (key TEXT, value TEXT)")
+    # Store metadata as _meta(source, target)
+    conn.execute("CREATE TABLE _meta (source TEXT, target TEXT)")
     for tbl_name, tbl_def in tables.items():
-        conn.execute("INSERT INTO _golden_meta VALUES (?, ?)",
-                     (f"table:{tbl_name}:source_sheet", tbl_def.get("source_sheet", "")))
-        conn.execute("INSERT INTO _golden_meta VALUES (?, ?)",
-                     (f"table:{tbl_name}:description", tbl_def.get("description", "")))
-        conn.execute("INSERT INTO _golden_meta VALUES (?, ?)",
-                     (f"table:{tbl_name}:row_count", str(len(tbl_def.get("rows", [])))))
+        source_sheet = tbl_def.get("source_sheet", "")
+        row_count = len(tbl_def.get("rows", []))
+        for ci, col in enumerate(tbl_def["columns"]):
+            if "ref" in col:
+                source = col["ref"]
+            else:
+                from openpyxl.utils import get_column_letter
+                cl = get_column_letter(ci + 1)
+                source = f"{source_sheet}!{cl}2:{cl}{1 + row_count}"
+            target = f"{tbl_name}/{col['name']}"
+            conn.execute("INSERT INTO _meta VALUES (?, ?)", (source, target))
     
     conn.commit()
     conn.close()
